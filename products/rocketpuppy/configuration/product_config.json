@@ -1,0 +1,50 @@
+{
+    "config_version": 3,
+    "pre_driver": [
+        {
+            "type": "ezc.pre_driver.power_management",
+            "enable_light_sleep": true,
+            "max_freq_mhz": 160,
+            "min_freq_mhz": 10
+        }
+    ],
+    "product_common": [
+        {
+            "type": "ezc.product_common.factory_reset",
+            "subtype": 1,
+            "count": 3,
+            "auto_trigger": true
+        }
+    ],
+    "test_mode": [
+        {
+            "type": "ezc.test_mode.common",
+            "subtype": 1
+        },
+        {
+            "type": "ezc.test_mode.ble",
+            "subtype": 1
+        },
+        {
+            "type": "ezc.test_mode.sniffer",
+            "subtype": 1,
+            "trigger": 3
+        },
+        {
+            "type": "ezc.test_mode.low_code",
+            "subtype": 1,
+            "ssid": "test_low_code_1"
+        },
+        {
+            "type": "ezc.test_mode.low_code",
+            "subtype": 2,
+            "ssid": "test_low_code_2"
+        },
+        {
+            "type": "ezc.test_mode.low_code",
+            "subtype": 3,
+            "ssid": "test_low_code_3"
+        }
+    ],
+    "device_management": true
+}
