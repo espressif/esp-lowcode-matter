@@ -21,6 +21,9 @@
 #include <relay_driver.h>
 #include <light_driver.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
+
 #include "app_priv.h"
 
 #define BUTTON1_GPIO_NUM ((gpio_num_t)9)
@@ -32,15 +35,30 @@
 static const char *TAG = "app_driver";
 
 static bool socket_states[2] = {false, false};
+static TimerHandle_t auto_off_timers[2] = {nullptr, nullptr};
 
-static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+#define SOCKET_AUTO_OFF_DELAY_MS 500
+
+static void app_driver_report_socket_state(uint8_t endpoint_id);
+static void app_driver_schedule_auto_off(uint8_t endpoint_id, bool state);
+
+static void app_driver_auto_off_timer_callback(TimerHandle_t xTimer)
 {
-    uint8_t endpoint_id = (uint8_t)(uintptr_t)data;
+    uint8_t endpoint_id = (uint8_t)(uintptr_t)pvTimerGetTimerID(xTimer);
     uint8_t socket_index = endpoint_id - 1;
 
-    socket_states[socket_index] = !socket_states[socket_index];
-    printf("%s: Set socket %d state to %d\n", TAG, endpoint_id, socket_states[socket_index]);
-    app_driver_set_socket_state(endpoint_id, socket_states[socket_index]);
+    if (!socket_states[socket_index]) {
+        return;
+    }
+
+    printf("%s: Auto-off timer expired for socket %d\n", TAG, endpoint_id);
+    app_driver_set_socket_state(endpoint_id, false);
+    app_driver_report_socket_state(endpoint_id);
+}
+
+static void app_driver_report_socket_state(uint8_t endpoint_id)
+{
+    uint8_t socket_index = endpoint_id - 1;
 
     low_code_feature_data_t update_data = {
         .details = {
@@ -55,6 +73,45 @@ static void app_driver_toggle_socket_state_button_callback(void *arg, void *data
     };
 
     low_code_feature_update_to_system(&update_data);
+}
+
+static void app_driver_schedule_auto_off(uint8_t endpoint_id, bool state)
+{
+    uint8_t socket_index = endpoint_id - 1;
+    TimerHandle_t timer = auto_off_timers[socket_index];
+
+    if (!timer) {
+        return;
+    }
+
+    if (state) {
+        if (xTimerIsTimerActive(timer) != pdFALSE) {
+            if (xTimerStop(timer, 0) != pdPASS) {
+                printf("%s: Failed to restart auto-off timer for socket %d\n", TAG, endpoint_id);
+                return;
+            }
+        }
+        if (xTimerStart(timer, 0) != pdPASS) {
+            printf("%s: Failed to start auto-off timer for socket %d\n", TAG, endpoint_id);
+        }
+    } else {
+        if (xTimerIsTimerActive(timer) != pdFALSE) {
+            if (xTimerStop(timer, 0) != pdPASS) {
+                printf("%s: Failed to stop auto-off timer for socket %d\n", TAG, endpoint_id);
+            }
+        }
+    }
+}
+
+static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+{
+    uint8_t endpoint_id = (uint8_t)(uintptr_t)data;
+    uint8_t socket_index = endpoint_id - 1;
+
+    socket_states[socket_index] = !socket_states[socket_index];
+    printf("%s: Set socket %d state to %d\n", TAG, endpoint_id, socket_states[socket_index]);
+    app_driver_set_socket_state(endpoint_id, socket_states[socket_index]);
+    app_driver_report_socket_state(endpoint_id);
 }
 
 static void app_driver_trigger_factory_reset_button_callback(void *arg, void *data)
@@ -123,6 +180,19 @@ int app_driver_init()
     /* Set initial LED states */
     light_driver_set_power(socket_states[0] || socket_states[1]);
 
+    for (uint8_t endpoint_id = 1; endpoint_id <= 2; endpoint_id++) {
+        auto_off_timers[endpoint_id - 1] = xTimerCreate(
+            "socket_auto_off",
+            pdMS_TO_TICKS(SOCKET_AUTO_OFF_DELAY_MS),
+            pdFALSE,
+            (void *)(uintptr_t)endpoint_id,
+            app_driver_auto_off_timer_callback);
+        if (!auto_off_timers[endpoint_id - 1]) {
+            printf("%s: Failed to create auto-off timer for socket %d\n", TAG, endpoint_id);
+            return -1;
+        }
+    }
+
     printf("%s: App driver initialized\n", TAG);
     return 0;
 }
@@ -139,6 +209,8 @@ int app_driver_set_socket_state(uint16_t endpoint_id, bool state)
 
     bool any_socket_on = socket_states[0] || socket_states[1];
     light_driver_set_power(any_socket_on);
+
+    app_driver_schedule_auto_off(endpoint_id, state);
 
     return 0;
 }
