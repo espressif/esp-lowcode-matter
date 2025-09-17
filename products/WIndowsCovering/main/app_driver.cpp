@@ -30,6 +30,7 @@
 #define RELAY1_GPIO_NUM ((gpio_num_t)1)
 #define RELAY2_GPIO_NUM ((gpio_num_t)2)
 #define INDICATOR_GPIO_NUM ((gpio_num_t)8)
+#define AUTO_OFF_TIMEOUT_MS (500)
 
 static const char *TAG = "app_driver";
 
@@ -37,6 +38,7 @@ static bool socket_states[2] = {false, false};
 static system_timer_handle_t auto_off_timers[2] = {nullptr, nullptr};
 
 static void app_driver_report_socket_state(uint16_t endpoint_id);
+static void cleanup_auto_off_timers(uint16_t max_endpoint_id);
 
 static void auto_off_timer_callback(system_timer_handle_t timer_handle, void *arg)
 {
@@ -64,6 +66,24 @@ static void manage_auto_off_timer(uint16_t endpoint_id, bool state)
         ret = system_timer_start(timer);
         if (ret != 0) {
             printf("%s: Failed to start auto-off timer for socket %d (err %d)\n", TAG, endpoint_id, ret);
+        }
+    }
+}
+
+static void cleanup_auto_off_timers(uint16_t max_endpoint_id)
+{
+    for (uint16_t endpoint_id = 1; endpoint_id <= max_endpoint_id; ++endpoint_id) {
+        system_timer_handle_t &timer = auto_off_timers[endpoint_id - 1];
+        if (timer) {
+            int ret = system_timer_stop(timer);
+            if (ret != 0) {
+                printf("%s: Failed to stop auto-off timer for socket %d during cleanup (err %d)\n", TAG, endpoint_id, ret);
+            }
+            ret = system_timer_delete(timer);
+            if (ret != 0) {
+                printf("%s: Failed to delete auto-off timer for socket %d during cleanup (err %d)\n", TAG, endpoint_id, ret);
+            }
+            timer = nullptr;
         }
     }
 }
@@ -118,10 +138,11 @@ int app_driver_init()
         auto_off_timers[endpoint_id - 1] = system_timer_create(
             auto_off_timer_callback,
             reinterpret_cast<void *>(static_cast<uintptr_t>(endpoint_id)),
-            500,
+            AUTO_OFF_TIMEOUT_MS,
             false);
         if (!auto_off_timers[endpoint_id - 1]) {
             printf("%s: Failed to create auto-off timer for socket %d\n", TAG, endpoint_id);
+            cleanup_auto_off_timers(endpoint_id - 1);
             return -1;
         }
     }
