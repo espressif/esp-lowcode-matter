@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include <system.h>
 #include <low_code.h>
@@ -33,16 +34,43 @@
 static const char *TAG = "app_driver";
 
 static bool socket_states[2] = {false, false};
+static system_timer_handle_t auto_off_timers[2] = {nullptr, nullptr};
 
-static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+static void app_driver_report_socket_state(uint16_t endpoint_id);
+
+static void auto_off_timer_callback(system_timer_handle_t timer_handle, void *arg)
 {
-    uint8_t endpoint_id = (uint8_t)(uintptr_t)data;
+    (void)timer_handle;
+    uint16_t endpoint_id = static_cast<uint16_t>(reinterpret_cast<uintptr_t>(arg));
+    printf("%s: Auto-off timer triggered for socket %d\n", TAG, endpoint_id);
+    app_driver_set_socket_state(endpoint_id, false);
+    app_driver_report_socket_state(endpoint_id);
+}
+
+static void manage_auto_off_timer(uint16_t endpoint_id, bool state)
+{
     uint8_t socket_index = endpoint_id - 1;
+    system_timer_handle_t timer = auto_off_timers[socket_index];
+    if (!timer) {
+        return;
+    }
 
-    socket_states[socket_index] = !socket_states[socket_index];
-    printf("%s: Set socket %d state to %d\n", TAG, endpoint_id, socket_states[socket_index]);
-    app_driver_set_socket_state(endpoint_id, socket_states[socket_index]);
+    int ret = system_timer_stop(timer);
+    if (ret != 0) {
+        printf("%s: Failed to stop auto-off timer for socket %d (err %d)\n", TAG, endpoint_id, ret);
+    }
 
+    if (state) {
+        ret = system_timer_start(timer);
+        if (ret != 0) {
+            printf("%s: Failed to start auto-off timer for socket %d (err %d)\n", TAG, endpoint_id, ret);
+        }
+    }
+}
+
+static void app_driver_report_socket_state(uint16_t endpoint_id)
+{
+    uint8_t socket_index = endpoint_id - 1;
     low_code_feature_data_t update_data = {
         .details = {
             .endpoint_id = endpoint_id,
@@ -51,11 +79,22 @@ static void app_driver_toggle_socket_state_button_callback(void *arg, void *data
         .value = {
             .type = LOW_CODE_VALUE_TYPE_BOOLEAN,
             .value_len = sizeof(bool),
-            .value = (uint8_t*)&socket_states[socket_index],
+            .value = reinterpret_cast<uint8_t *>(&socket_states[socket_index]),
         },
     };
 
     low_code_feature_update_to_system(&update_data);
+}
+
+static void app_driver_toggle_socket_state_button_callback(void *arg, void *data)
+{
+    uint8_t endpoint_id = (uint8_t)(uintptr_t)data;
+    uint8_t socket_index = endpoint_id - 1;
+
+    bool new_state = !socket_states[socket_index];
+    printf("%s: Set socket %d state to %d\n", TAG, endpoint_id, new_state);
+    app_driver_set_socket_state(endpoint_id, new_state);
+    app_driver_report_socket_state(endpoint_id);
 }
 
 static void app_driver_trigger_factory_reset_button_callback(void *arg, void *data)
@@ -74,7 +113,19 @@ int app_driver_init()
     /* Initialize relays */
     relay_driver_init(RELAY1_GPIO_NUM);
     relay_driver_init(RELAY2_GPIO_NUM);
-    
+
+    for (uint16_t endpoint_id = 1; endpoint_id <= 2; ++endpoint_id) {
+        auto_off_timers[endpoint_id - 1] = system_timer_create(
+            auto_off_timer_callback,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(endpoint_id)),
+            500,
+            false);
+        if (!auto_off_timers[endpoint_id - 1]) {
+            printf("%s: Failed to create auto-off timer for socket %d\n", TAG, endpoint_id);
+            return -1;
+        }
+    }
+
 
     /* Initialize button 1 */
     button_config_t btn1_cfg = {
@@ -138,6 +189,8 @@ int app_driver_set_socket_state(uint16_t endpoint_id, bool state)
     /* Set appropriate relay */
     gpio_num_t relay_gpio = (endpoint_id == 1) ? RELAY1_GPIO_NUM : RELAY2_GPIO_NUM;
     relay_driver_set_power(relay_gpio, !state);
+
+    manage_auto_off_timer(endpoint_id, state);
 
     bool any_socket_on = socket_states[0] || socket_states[1];
     light_driver_set_power(any_socket_on);
