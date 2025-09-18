@@ -157,6 +157,7 @@ int app_driver_init()
     button_handle_t btn1_handle = button_driver_create(&btn1_cfg);
     if (!btn1_handle) {
         printf("Failed to create button 1\n");
+        cleanup_auto_off_timers(2);
         return -1;
     }
 
@@ -173,6 +174,7 @@ int app_driver_init()
     button_handle_t btn2_handle = button_driver_create(&btn2_cfg);
     if (!btn2_handle) {
         printf("Failed to create button 2\n");
+        cleanup_auto_off_timers(2);
         return -1;
     }
 
