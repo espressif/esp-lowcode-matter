@@ -8,5 +8,8 @@ menu "Light"
 
         config USE_LIGHT_DEVICE_TYPE_LED
         bool "Select LED as light device"
+
+        config USE_LIGHT_DEVICE_TYPE_BP5758
+        bool "Select BP5758 as light device"
     endchoice
 endmenu

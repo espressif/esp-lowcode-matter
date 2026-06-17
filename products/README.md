@@ -3,6 +3,7 @@
 | Product Name          | Description                                                                                                  |
 |-----------------------|--------------------------------------------------------------------------------------------------------------|
 | **light_cw_pwm**      | Light that supports the dimming of cold and warm white (CW) using PWM (Pulse Width Modulation). |
+| **light_cw_bp5758**   | Light that supports the dimming of cold and warm white (CW) using BP5758 I2C LED driver. |
 | **light_rgbcw_ws2812**| Light that supports RGB color along with cold and warm white (CW) using WS2812 addressable RGB LEDs. |
 | **occupancy_sensor**  | An occupancy detector using the LD2420 radar sensor (utilising UART driver) |
 | **socket**            | Smart socket that controls a device or load connected to it. |

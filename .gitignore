@@ -14,3 +14,4 @@ products/*/configuration/output/*
 .DS_Store
 .vscode/
 .environment/
+_codeql_detected_source_root

@@ -1,0 +1,2 @@
+# set light type to bp5758
+CONFIG_USE_LIGHT_DEVICE_TYPE_BP5758=y

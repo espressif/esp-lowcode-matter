@@ -6,6 +6,7 @@
 #include "sw_timer.h"
 #include "led_driver.h"
 #include "ws2812_driver.h"
+#include "bp5758_driver.h"
 #include "light_driver.h"
 #include "color_format.h"
 #include "ulp_lp_core_print.h"
@@ -93,6 +94,17 @@ static void light_driver_device_ws2812_init(void) {
     g_light.dev.get_channel = (light_dev_get_channel_t)(NULL);
     g_light.dev.update_channels = ws2812_driver_update_channels;
     g_light.dev.regist_channel = ws2812_driver_regist_channel;
+}
+#endif
+
+#ifdef CONFIG_USE_LIGHT_DEVICE_TYPE_BP5758
+static void light_driver_device_bp5758_init(void) {
+    g_light.dev.init = bp5758_driver_init;
+    g_light.dev.deinit = bp5758_driver_deinit;
+    g_light.dev.set_channel = bp5758_driver_set_channel;
+    g_light.dev.get_channel = (light_dev_get_channel_t)(NULL);
+    g_light.dev.update_channels = bp5758_driver_update_channels;
+    g_light.dev.regist_channel = bp5758_driver_regist_channel;
 }
 #endif
 
@@ -192,6 +204,49 @@ int light_driver_init(light_driver_config_t *config)
             g_light.dev.regist_channel(LED_CHANNEL_BLUE, config->io_conf.led_io.blue);
             g_light.dev.regist_channel(LED_CHANNEL_COLD, config->io_conf.led_io.cold);
             g_light.dev.regist_channel(LED_CHANNEL_WARM, config->io_conf.led_io.warm);
+            break;
+        default:
+            printf("Unsupported channel setting\n");
+            break;
+        }
+        break;
+    #endif
+    #ifdef CONFIG_USE_LIGHT_DEVICE_TYPE_BP5758
+    case LIGHT_DEVICE_TYPE_BP5758:
+        printf("Light: BP5758\n");
+        light_driver_device_bp5758_init();
+
+        /* Register I2C pins first before init */
+        g_light.dev.regist_channel(0, config->io_conf.bp5758_io.sda_io);
+        g_light.dev.regist_channel(1, config->io_conf.bp5758_io.scl_io);
+
+        if (g_light.dev.init() != 0) {
+            printf("Failed to init device\n");
+            g_light.dev.deinit();
+        }
+
+        switch (config->channel_comb) {
+        case LIGHT_CHANNEL_COMB_1CH_C:
+            g_light.channel.cold = BP5758_CHANNEL_COLD;
+            break;
+        case LIGHT_CHANNEL_COMB_1CH_W:
+            g_light.channel.warm = BP5758_CHANNEL_WARM;
+            break;
+        case LIGHT_CHANNEL_COMB_2CH_CW:
+            g_light.channel.cold = BP5758_CHANNEL_COLD;
+            g_light.channel.warm = BP5758_CHANNEL_WARM;
+            break;
+        case LIGHT_CHANNEL_COMB_3CH_RGB:
+            g_light.channel.red = BP5758_CHANNEL_RED;
+            g_light.channel.green = BP5758_CHANNEL_GREEN;
+            g_light.channel.blue = BP5758_CHANNEL_BLUE;
+            break;
+        case LIGHT_CHANNEL_COMB_5CH_RGBCW:
+            g_light.channel.red = BP5758_CHANNEL_RED;
+            g_light.channel.green = BP5758_CHANNEL_GREEN;
+            g_light.channel.blue = BP5758_CHANNEL_BLUE;
+            g_light.channel.cold = BP5758_CHANNEL_COLD;
+            g_light.channel.warm = BP5758_CHANNEL_WARM;
             break;
         default:
             printf("Unsupported channel setting\n");

@@ -53,6 +53,7 @@ typedef enum {
 typedef enum {
     LIGHT_DEVICE_TYPE_LED = 0,    /**< Standard LED device. This uses PWM driver. */
     LIGHT_DEVICE_TYPE_WS2812,     /**< WS2812 addressable LED device */
+    LIGHT_DEVICE_TYPE_BP5758,     /**< BP5758 I2C LED driver device */
     LIGHT_DEVICE_TYPE_MAX,
 } light_device_type_t;
 
@@ -70,6 +71,10 @@ typedef union {
     struct {
         gpio_num_t ctrl_io; /**< Control GPIO for WS2812 */
     } ws2812_io;          /**< WS2812 GPIO configuration */
+    struct {
+        gpio_num_t sda_io; /**< SDA GPIO for BP5758 I2C */
+        gpio_num_t scl_io; /**< SCL GPIO for BP5758 I2C */
+    } bp5758_io;          /**< BP5758 I2C GPIO configuration */
 } light_io_conf_t;
 
 /**
