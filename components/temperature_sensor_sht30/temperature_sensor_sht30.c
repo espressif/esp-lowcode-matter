@@ -172,3 +172,41 @@ int temperature_sensor_sht30_get_celsius(int i2c_port, float *temperature)
 
     return sht30_read_measurement(i2c_port, temperature, NULL);
 }
+
+int temperature_sensor_sht30_get_humidity(int i2c_port, float *humidity)
+{
+    if (!humidity) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err;
+
+    // Start a single shot measurement
+    err = sht30_send_command(i2c_port, MEASUREMENT_SINGLE_SHOT_L_CS_DIS_CMD);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    ulp_lp_core_delay_cycles(15);
+
+    return sht30_read_measurement(i2c_port, NULL, humidity);
+}
+
+int temperature_sensor_sht30_get_celsius_and_humidity(int i2c_port, float *temperature, float *humidity)
+{
+    if (!temperature && !humidity) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err;
+
+    // Start a single shot measurement
+    err = sht30_send_command(i2c_port, MEASUREMENT_SINGLE_SHOT_L_CS_DIS_CMD);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    ulp_lp_core_delay_cycles(15);
+
+    return sht30_read_measurement(i2c_port, temperature, humidity);
+}

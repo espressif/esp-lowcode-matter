@@ -62,6 +62,7 @@ typedef enum {
     LOW_CODE_FEATURE_ID_HEATING_SETPOINT = 4006, /*!< Heating setpoint control */
     LOW_CODE_FEATURE_ID_TEMPERATURE_SENSOR_VALUE = 5001,  /*!< Temperature sensor */
     LOW_CODE_FEATURE_ID_OCCUPANCY_SENSOR_VALUE = 6001,  /*!< Occupancy sensor */
+    LOW_CODE_FEATURE_ID_HUMIDITY_SENSOR_VALUE = 7001,  /*!< Humidity sensor */
     LOW_CODE_FEATURE_ID_MAX = UINT32_MAX    /*!< Maximum feature ID value */
 } low_code_feature_id_t;
 
