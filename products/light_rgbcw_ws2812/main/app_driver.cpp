@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 #include <light_driver.h>
+#include "color_format.h"
 
 #include "app_priv.h"
 
@@ -75,7 +76,9 @@ int app_driver_set_light_temperature(uint16_t temperature)
 {
     temperature = 1000000 / temperature;
     printf("%s: Setting light temperature: %d\n", TAG, temperature);
-    return light_driver_set_temperature(temperature);
+    HS_color_t hs;
+    temp_to_hs(temperature, &hs);
+    return light_driver_set_saturation(hs.saturation) | light_driver_set_hue(hs.hue);
 }
 
 int app_driver_event_handler(low_code_event_t *event)
